@@ -1,0 +1,27 @@
+v1.2
+    - Update to module template v3
+    - Add link target info into module.prop.
+    - Reorder init.d link priority for Magisk v12:
+        1. /magisk/.core/service.d (Magisk v12)
+        2. /magisk/.core/post-fs-data.d (Magisk v11)
+        3. /magisk/phh/su.d
+        4. /su/su.d
+        5. /magisk/.core/post-fs-data.d (Magisk v12)
+        6. /magisk/.core/service.d (Magisk v11)
+    - There is also a post-fs-data branch keep post-fs-data.d at high priority by force.
+
+v1.1
+    - Reorder init.d link priority:
+        1. /magisk/.core/post-fs-data.d
+        2. /magisk/phh/su.d
+        3. /su/su.d
+        4. /magisk/.core/service.d
+
+v1.0
+    - First release
+    - init.d link priority:
+        1. /magisk/.core/service.d
+        2. /magisk/.core/post-fs-data.d
+        3. /magisk/phh/su.d
+        4. /su/su.d
+    - Create an init.d folder systemlessly as the last resort.

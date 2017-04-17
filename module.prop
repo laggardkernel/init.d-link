@@ -1,0 +1,10 @@
+id=init.d
+name=Init.d Link
+version=v1.2
+versionCode=12
+author=laggardkernel
+description=Make a soft link named init.d from an existing *.d folder, or simply create an init.d folder systemlessly to be used by the kernel. Init.d scripts will be run by an existing superuser — MagiskSU, phh's superuser or SuperSU — or the kernel, but not by the module itself. STUB
+support=https://github.com/laggardkernel/init.d-link
+donate=https://github.com/laggardkernel
+cacheModule=false
+template=3

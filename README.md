@@ -2,14 +2,14 @@
 
 ### Intro
 
-The module solves the situation when /system/etc/init.d doesn't exist, some apps try to create this folder themselves. The best solution is to create it systemlessly by our users and keep the real system partition untouched.
+The module solves the situation when /system/etc/init.d doesn't exist, some app, let's say Kernel Auditor Beta, doesn't recognize the \*.d folder provided by MagiskSU and tries to create the init.d folder by itself. So we'd better symlink one from an available \*.d — post-fs-data.d, service.d or su.d.
 
-- The module try to make a soft link named init.d from an existing *.d folder.
-- Or simply create an init.d folder systemlessly to be used by the kernel.
-- init.d scripts will be run by an existing superuser — MagiskSU, phh's superuser or SuperSU — or the kernel,
-- init.d scripts will **NOT** be run by the module itself in case of collision with init.d support from kernel.
+- The module symlink a *.d folder as init.d,
+- or simply create one systemlessly.
+- Init.d scripts will be run by an existing superuser — MagiskSU, phh's superuser or SuperSU — or the kernel,
+- but **NOT** by the module itself, in case of collision with the func of kernel.
 
-### Soft Link Priority:
+### Symlink Priority:
 
 1. /magisk/.core/service.d (Magisk v12)
 2. /magisk/.core/post-fs-data.d (Magisk v11)
@@ -20,11 +20,11 @@ The module solves the situation when /system/etc/init.d doesn't exist, some apps
 
 The last resort will be the creation of a systemless init.d folder.
 
-**NOTE**: init.d will be linked only if corresponding *.d foler exists.
+**NOTE**: init.d will be symlinked only if available *.d foler exists.
 
 ### Support
 
-- [[Module] [Magisk] init.d link | require Magisk 12.0+](https://forum.xda-developers.com/apps/magisk/magisk-init-d-link-t3579550) post at XDA
+- [\[Module\] \[Magisk\] init.d link | require Magisk 12.0+](https://forum.xda-developers.com/apps/magisk/magisk-init-d-link-t3579550) post at XDA
 
 ### Credit
 

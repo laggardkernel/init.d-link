@@ -52,7 +52,7 @@ PROPFILE=false
 buildname="system.prop"
 tweakname="tweak.prop"
 
-VERSION="v1.2"
+VERSION="v1.3"
 REVISION="0.1"
 # APKNAME=*.apk
 # PACKAGENAME=*.*.*

@@ -1,3 +1,6 @@
+v1.3 - 20170420
+    - Fix mount of su.img
+
 v1.2
     - Update to module template v3
     - Add link target info into module.prop.

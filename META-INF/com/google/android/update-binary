@@ -127,50 +127,6 @@ set_separate_perm_recursive() {
   done
 }
 
-install_package() {
-  # Install Android package $APKNAME $PACKAGENAME
-  if [ -f "$MODPATH/system/app/${1%.apk}/$1" ]; then
-    ui_print "- Installing ${1%.apk} as system app systemlessly"
-    rm -rf /data/app/${2}-*
-    rm -rf /data/data/${2}
-
-  elif [ -f "$MODPATH/system/priv-app/${1%.apk}/$1" ]; then
-    ui_print "- Installing ${1%.apk} as system priv-app systemlessly"
-    rm -rf /data/app/${2}-*
-    rm -rf /data/data/${2}
-
-  elif [ -f "$INSTALLER/common/$1" ]; then
-    if [ -z `ls /data/app | grep "$2"-` ]; then
-      ui_print "- Installing ${1%.apk} as data app"
-      APKPATH="$2"-1
-      for i in `ls /data/app | grep "$2"-`; do
-        if [ `cat /data/system/packages.xml | grep $i >/dev/null 2>&1; echo $?` -eq 0 ]; then
-          APKPATH=$i
-          break;
-        fi
-      done
-      rm -rf /data/app/"$2"-* 2>/dev/null
-      ui_print "  target path: /data/app/$APKPATH"
-      mkdir /data/app/$APKPATH
-      chown 1000.1000 /data/app/$APKPATH
-      chmod 0755 /data/app/$APKPATH
-      chcon u:object_r:apk_data_file:s0 /data/app/$APKPATH
-      cp $INSTALLER/common/$1 /data/app/$APKPATH/base.apk
-      chown 1000.1000 /data/app/$APKPATH/base.apk
-      chmod 0644 /data/app/$APKPATH/base.apk
-      chcon u:object_r:apk_data_file:s0 /data/app/$APKPATH/base.apk
-      rm /data/$1 2>/dev/null
-    else
-      ui_print "- ${1%.apk} already exists on the device"
-      rm /data/$1 2>/dev/null
-    fi
-
-  else
-    ui_print "- ${1%.apk} is not included, install it later by yourself"
-
-  fi
-}
-
 ##########################################################################################
 # Flashable update-binary preparation
 ##########################################################################################
@@ -227,35 +183,6 @@ source config.sh
 INSTALLER=$TMPDIR/$MODID
 MODPATH=$MOUNTPATH/$MODID
 
-rm -rf $INSTALLER
-mkdir -p $INSTALLER
-cd $INSTALLER
-# unzip -o "$ZIP" common/* module.prop
-unzip -o "$ZIP"
-
-##########################################################################################
-# Main
-##########################################################################################
-
-# Print mod name
-print_modname
-
-# Please leave this message in your flashable zip for credits :)
-ui_print "******************************"
-ui_print "Powered by Magisk (@topjohnwu)"
-ui_print "******************************"
-
-ui_print "- Mounting /system(ro), /vendor(ro), /data, /cache"
-mount -o ro /system 2>/dev/null
-mount -o ro /vendor 2>/dev/null
-mount /data 2>/dev/null
-mount /cache 2>/dev/null
-
-if [ ! -f '/system/build.prop' ]; then
-  ui_print "! Failed: /system could not be mounted!"
-  exit 1
-fi
-
 # FILE LOCATIONS
 
 if [ -d "/system/system" ]; then
@@ -288,6 +215,42 @@ elif [ -d "/sdcard/0" ]; then
   SDCARD=/sdcard/0
 else
   SDCARD=/sdcard
+fi
+
+MIRRDIR="/dev/magisk/mirror"
+MIRRSYS=$SYS
+if $BOOTMODE; then
+  MIRRSYS=$MIRRDIR/system
+fi
+
+# unzip files into temperary folder $INSTALLER
+rm -rf $INSTALLER
+mkdir -p $INSTALLER
+cd $INSTALLER
+# unzip -o "$ZIP" common/* module.prop
+unzip -o "$ZIP"
+
+##########################################################################################
+# Main
+##########################################################################################
+
+# Print mod name
+print_modname
+
+# Please leave this message in your flashable zip for credits :)
+ui_print "******************************"
+ui_print "Powered by Magisk (@topjohnwu)"
+ui_print "******************************"
+
+ui_print "- Mounting /system(ro), /vendor(ro), /data, /cache"
+mount -o ro /system 2>/dev/null
+mount -o ro /vendor 2>/dev/null
+mount /data 2>/dev/null
+mount /cache 2>/dev/null
+
+if [ ! -f '/system/build.prop' ]; then
+  ui_print "! Failed: /system could not be mounted!"
+  exit 1
 fi
 
 API=`grep_prop ro.build.version.sdk`
@@ -373,27 +336,27 @@ LOOPDEVICE1=$LOOPDEVICE
 
 # Detecting /system/etc/init.d folder
 ui_print "- Detecting init.d folder"
-if [ -d "$SYS/etc/init.d" ]; then
+if [ -d "$MIRRSYS/etc/init.d" ]; then
   ui_print "! init.d exists already. Stop."
+  rm -rf $MODPATH 2>/dev/null
+  umount $MOUNTPATH
+  losetup -d $LOOPDEVICE1
+  rm -rf $MOUNTPATH
   if ! $BOOTMODE; then
-    umount $MOUNTPATH
-    losetup -d $LOOPDEVICE1
-    rm -rf $MOUNTPATH
     umount /system
     umount /vendor 2>/dev/null
   fi
-  rm -rf $INSTALLER
   exit 1
 else
-  ui_print "  No init.d folder exists. Starting..."
+  ui_print "  No init.d folder exists in system. Starting..."
 fi
 
 # Looking for su.d, post-fs-data.d
 ui_print "- Looking for existing *.d as link target"
-LINKTARGET=""
 # Magisk v12 /magisk/.core/bin/su, MagiskSU is enabled in service stage
 # Magisk v11 /magisk/.core/su/su, MagiskSU is enabled in post-fs-data stage
-# Magisk v10 phh's superuser
+# Magisk v10 phh's superuser, /magisk/phh/bin/su
+LINKTARGET=""
 if [ -e "/magisk/.core/bin/su" -a -d "/magisk/.core/service.d" ]; then
   LINKTARGET="/magisk/.core/service.d"
 elif [ -e "/magisk/.core/su/su" -a -d "/magisk/.core/post-fs-data.d" ]; then
@@ -404,25 +367,26 @@ elif [ -e "/magisk/phh/bin/su" -a ! -e "/magisk/phh/disable" -a ! -e "/magisk/ph
 elif [ -f /sbin/launch_daemonsu.sh ]; then
     SUIMG=$(ls /data/su.img || ls /cache/su.img) 2>/dev/null;
     SUMOUNTPATH=/$(basename $SUIMG .img)
-    if [ "$SUIMG" -a ! "$BOOTMODE" ]; then
+    if ! "$BOOTMODE" && [ "$SUIMG" ]; then
       umount "$SUMOUNTPATH" 2>/dev/null
       mount_image "$SUIMG" "$SUMOUNTPATH"
+      LOOPDEVICE2=$LOOPDEVICE
     fi
-    if ! is_mounted $SUMOUNTPATH; then
+    if [ ! -d "/su/bin" ]; then
       ui_print "! $SUIMG mount failed... abort"
+      rm -rf $MODPATH 2>/dev/null
+      umount $MOUNTPATH
+      losetup -d $LOOPDEVICE1
+      rm -rf $MOUNTPATH
       if ! $BOOTMODE; then
-        umount $MOUNTPATH
-        losetup -d $LOOPDEVICE1
-        rm -rf $MOUNTPATH
         umount /system
         umount /vendor 2>/dev/null
       fi
-      rm -rf $INSTALLER
       exit 1
+    else
+      mkdir -p "$SUMOUNTPATH/su.d" 2>/dev/null
+      LINKTARGET="$SUMOUNTPATH/su.d"
     fi
-    LOOPDEVICE2=$LOOPDEVICE
-    mkdir -p "$SUMOUNTPATH/su.d" 2>/dev/null
-    LINKTARGET="$SUMOUNTPATH/su.d"
 # the two entries below may be redundant
 elif [ -e "/magisk/.core/bin/su" -a -d "/magisk/.core/post-fs-data.d" ]; then
   LINKTARGET="/magisk/.core/post-fs-data.d"
@@ -434,22 +398,19 @@ fi
 
 if [ ! -z "$LINKTARGET" ]; then
   ui_print "- Linking $LINKTARGET as $MODPATH$SYS/etc/init.d"
-  rm -rf $MODPATH
+  rm -rf $MODPATH 2>/dev/null
   mkdir -p $MODPATH$SYS/etc
   ln -s "$LINKTARGET" "$MODPATH$SYS/etc/init.d"
-  # Add additional info in module.prop
-  sed -i "s#STUB#Info: link from ${LINKTARGET}.#" $INSTALLER/module.prop
+  # Add link info into module.prop
+  sed -i "s#LINK_INFO_STUB#Info: link from ${LINKTARGET}.#" $INSTALLER/module.prop
 else
   ui_print "- No available *.d folder is found."
   ui_print "  ONLY create a init.d folder systemlessly"
-  ui_print "  in case that your custom kernel support init.d."
+  ui_print "  in case that your kernel support init.d."
   mktouch "$MODPATH$SYS/etc/init.d/placeholder"
-  # Add additional info in module.prop
-  sed -i "s#STUB#Info: init.d is created systemlessly.#" $INSTALLER/module.prop
+  # Add link info into module.prop
+  sed -i "s#LINK_INFO_STUB#Info: init.d is created systemlessly.#" $INSTALLER/module.prop
 fi
-
-# Install package
-# install_package "$APKNAME" "$PACKAGENAME"
 
 # build property database patch for MOD by resetprop, through a
 # property file called "custom_build.prop" or any other name, default name system.prop

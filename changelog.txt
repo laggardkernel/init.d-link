@@ -1,5 +1,7 @@
 v1.3 - 20170420
-    - Fix mount of su.img
+    - Support uninstallation
+    - Support log tracking of installation
+    - Fix mount of su.img if used
 
 v1.2
     - Update to module template v3

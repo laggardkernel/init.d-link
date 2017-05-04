@@ -47,17 +47,9 @@ LATESTARTSERVICE=false
 
 # Set to true if you need custom setprop script
 PROPFILE=false
-# personal file's name located anywhere on your internal storage
-# buildname="custom_build.prop"
-buildname="system.prop"
-tweakname="tweak.prop"
 
-VERSION="v1.2"
+VERSION="v1.3"
 REVISION="0.1"
-# APKNAME=*.apk
-# PACKAGENAME=*.*.*
-
-REMOVAL=
 
 ##########################################################################################
 # Installation Message

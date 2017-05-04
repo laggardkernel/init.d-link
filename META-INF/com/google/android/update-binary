@@ -1,5 +1,11 @@
 #!/sbin/sh
 
+# Start tracking and logging
+LOGFILE=/cache/initd_inst.log
+rm "${LOGFILE}"
+touch "${LOGFILE}"
+exec >> "${LOGFILE}" 2>&1
+
 # Detect whether in boot mode
 ps | grep zygote | grep -v grep >/dev/null && BOOTMODE=true || BOOTMODE=false
 
@@ -116,7 +122,25 @@ image_size_check() {
   curSizeM=$((curSizeM * 4 / 1024))
 }
 
-# custom functions
+# Custom functions
+
+# Unmount and clean the unziped files before exit
+# Usage: safe_exit "1" "! Operation failed"
+safe_exit() {
+  rm -rf $MODPATH
+  umount $MOUNTPATH
+  losetup -d $LOOPDEVICE
+  rmdir $MOUNTPATH
+  if ! $BOOTMODE; then
+    umount /system
+    umount /vendor 2>/dev/null
+  fi
+  rm -rf $INSTALLER
+  if [ ! -z "$2"]; then
+    ui_print "$2"
+  fi
+  exit "$1"
+}
 
 set_separate_perm_recursive() {
   find $1 -type d 2>/dev/null | while read dir; do
@@ -217,14 +241,16 @@ else
   SDCARD=/sdcard
 fi
 
-MIRRDIR="/dev/magisk/mirror"
-MIRRSYS=$SYS
+MIRRDIR=""
 if $BOOTMODE; then
-  MIRRSYS=$MIRRDIR/system
+  MIRRDIR="/dev/magisk/mirror"
 fi
 
+MIRRSYS="$MIRRDIR$SYS"
+
+# Clean temporary files
+rm -rf $INSTALLER 2>/dev/null
 # unzip files into temperary folder $INSTALLER
-rm -rf $INSTALLER
 mkdir -p $INSTALLER
 cd $INSTALLER
 # unzip -o "$ZIP" common/* module.prop
@@ -332,13 +358,28 @@ if ! is_mounted $MOUNTPATH; then
   ui_print "! $IMG mount failed... abort"
   exit 1
 fi
+
 LOOPDEVICE1=$LOOPDEVICE
+
+# #TODO: If we're upgrading in Magisk Manager,
+# just overwrite files in /magisk/$MODID directly
+UPGRADE=false
+$BOOTMODE && [ -d "/magisk/$MODID" ] && UPGRADE=true
+
+# Flashing zip twice for uninstallation, ONLY available in recovery
+if ! $BOOTMODE && [ -d "$MODPATH" ]; then
+  ui_print "- Removing module $MODPATH"
+  safe_exit 0 "- Done"
+else
+  ui_print "- Installing module $MODPATH"
+fi
+
+rm -rf $MODPATH 2>/dev/null
 
 # Detecting /system/etc/init.d folder
 ui_print "- Detecting init.d folder"
 if [ -d "$MIRRSYS/etc/init.d" ]; then
-  ui_print "! init.d exists already. Stop."
-  rm -rf $MODPATH 2>/dev/null
+  ui_print "! init.d exists already... abort"
   umount $MOUNTPATH
   losetup -d $LOOPDEVICE1
   rm -rf $MOUNTPATH
@@ -346,6 +387,7 @@ if [ -d "$MIRRSYS/etc/init.d" ]; then
     umount /system
     umount /vendor 2>/dev/null
   fi
+  rm -rf $INSTALLER
   exit 1
 else
   ui_print "  No init.d folder exists in system. Starting..."
@@ -374,7 +416,6 @@ elif [ -f /sbin/launch_daemonsu.sh ]; then
     fi
     if [ ! -d "/su/bin" ]; then
       ui_print "! $SUIMG mount failed... abort"
-      rm -rf $MODPATH 2>/dev/null
       umount $MOUNTPATH
       losetup -d $LOOPDEVICE1
       rm -rf $MOUNTPATH
@@ -382,6 +423,7 @@ elif [ -f /sbin/launch_daemonsu.sh ]; then
         umount /system
         umount /vendor 2>/dev/null
       fi
+      rm -rf $INSTALLER
       exit 1
     else
       mkdir -p "$SUMOUNTPATH/su.d" 2>/dev/null
@@ -398,7 +440,6 @@ fi
 
 if [ ! -z "$LINKTARGET" ]; then
   ui_print "- Linking $LINKTARGET as $MODPATH$SYS/etc/init.d"
-  rm -rf $MODPATH 2>/dev/null
   mkdir -p $MODPATH$SYS/etc
   ln -s "$LINKTARGET" "$MODPATH$SYS/etc/init.d"
   # Add link info into module.prop
@@ -415,7 +456,7 @@ fi
 # build property database patch for MOD by resetprop, through a
 # property file called "custom_build.prop" or any other name, default name system.prop
 if $PROPFILE; then
-  cp -af "$INSTALLER/common/$buildname" "$MODPATH/$buildname"
+  cp -af $INSTALLER/common/system.prop $MODPATH/system.prop
 fi
 
 # Handle separate vendor partition replacement is
